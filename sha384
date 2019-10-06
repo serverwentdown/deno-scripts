@@ -1,0 +1,52 @@
+#!/usr/bin/env deno
+
+import "https://github.com/emn178/js-sha512/raw/v0.8.0/build/sha512.min.js";
+
+const CHUNKSIZE = 128;
+
+async function main() {
+
+	let files = [];
+
+	if (Deno.args.length > 1) {
+		files.push(...await Promise.all(
+			Deno.args.slice(1).map(async path => ({
+				path,
+				file: await Deno.open(path, "r"),
+			}))
+		));
+	} else {
+		files.push({
+			path: "-",
+			file: Deno.stdin,
+		});
+	}
+
+	const hashes = await Promise.all(
+		files.map(async file => {
+			const hash = sha384.create();
+			const buf = new Uint8Array(CHUNKSIZE);
+
+			let read = 0;
+			while (true) {
+				read = await file.file.read(buf);
+				hash.update(buf.slice(0, read));
+				if (read === Deno.EOF) {
+					break;
+				}
+			}
+
+			return {
+				...file,
+				hash: hash.hex(),
+			};
+		})
+	);
+
+	for (const file of hashes) {
+		console.log(`${file.hash}  ${file.path}`);
+	}
+
+}
+
+main();
